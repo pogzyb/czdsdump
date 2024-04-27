@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pogzyb/czdsdump/download/file"
-	"github.com/pogzyb/czdsdump/download/s3"
+	"github.com/pogzyb/czdsdump/download/loader"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -24,31 +24,30 @@ func init() {
 	if BaseURL == "" {
 		BaseURL = "https://czds-api.icann.org"
 	}
-	DefaultTimeout = 30
 }
 
-type Dumper interface {
-	Init(ctx context.Context, path string, zoneLink string) error
-	Copy(ctx context.Context, r io.Reader) error
+type Loader interface {
+	Download(ctx context.Context, accessToken string) (io.Reader, error)
+	DownloadZone(ctx context.Context, accessToken string) error
+	Save(ctx context.Context, r io.Reader) error
 }
 
-func GetDumper(ctx context.Context, path, zoneLink string) (Dumper, error) {
-	var d Dumper
-	if strings.HasPrefix(path, "s3://") || strings.HasPrefix(path, "S3://") {
-		d = new(s3.DumperS3)
+func NewLoader(outputFile, zoneURL string, numWorkers int) (Loader, error) {
+	if strings.HasPrefix(outputFile, "s3://") || strings.HasPrefix(outputFile, "S3://") {
+		log.Debug().Msg("Using S3 Loader!")
+		return loader.NewS3Loader(outputFile, zoneURL, numWorkers)
 	} else {
-		d = new(file.DumperFile)
+		return loader.NewFileLoader(outputFile, zoneURL, numWorkers), nil
 	}
-	err := d.Init(ctx, path, zoneLink)
-	return d, err
 }
 
-func newHTTPClient() *http.Client {
-	return &http.Client{Timeout: time.Second * time.Duration(DefaultTimeout)}
+func GetTLDFromURL(zoneURL string) string {
+	splits := strings.Split(zoneURL, "/")
+	return splits[len(splits)-1]
 }
 
-func GetZoneLinks(ctx context.Context, accessToken string) ([]string, error) {
-	client := newHTTPClient()
+func GetZoneURLs(ctx context.Context, accessToken string) ([]string, error) {
+	client := http.Client{Timeout: time.Second * 30}
 	url := BaseURL + "/czds/downloads/links"
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -66,20 +65,4 @@ func GetZoneLinks(ctx context.Context, accessToken string) ([]string, error) {
 		return []string{}, err
 	}
 	return zones, nil
-}
-
-func DumpZone(ctx context.Context, dumper Dumper, accessToken, zoneLink string) error {
-	client := newHTTPClient()
-	req, err := http.NewRequestWithContext(ctx, "GET", zoneLink, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	err = dumper.Copy(ctx, resp.Body)
-	return err
 }

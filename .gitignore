@@ -1,3 +1,7 @@
+.env.aws
+scratch
+czds
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
