@@ -6,6 +6,10 @@ RUN go build -o czdsdump .
 
 FROM alpine:3.19
 
+ARG VERSION
+ARG CREATED
+ARG REVISION
+
 LABEL org.opencontainers.image.title="CZDSdump"
 LABEL org.opencontainers.image.description="Tool for dumping the Centralized Zone Data System."
 LABEL org.opencontainers.image.version=$VERSION
