@@ -25,14 +25,14 @@ go build -o czdsdump .
 Docker
 ```
 docker pull ghcr.io/pogzyb/czdsdump:latest
-docker run -v ./data:/tmp czdsdump download all -v -o /tmp -u <user> -p <password>
+docker run -v ./data:/tmp ghcr.io/pogzyb/czdsdump download all -v -o /tmp -u <user> -p <password>
 ```
 
 Dump to an S3 bucket
 ```
 # assumes you have aws credentials set in `.env.aws`
 docker pull ghcr.io/pogzyb/czdsdump:latest
-docker run --env-file .env.aws czdsdump download all -v -o s3://mybucket/czds/2024-04-28/ -u <user> -p <password>
+docker run --env-file .env.aws ghcr.io/pogzyb/czdsdump download all -v -o s3://mybucket/czds/2024-04-28/ -u <user> -p <password>
 ```
 
 Dump only one zone
@@ -40,7 +40,7 @@ Dump only one zone
 # assumes you have aws credentials set in `.env.aws`
 docker pull ghcr.io/pogzyb/czdsdump:latest
 # only downloads data from ".com" zone
-docker run -v ./data:/tmp czdsdump download one -v -o /tmp -u <user> -p <password> -z com
+docker run -v ./data:/tmp ghcr.io/pogzyb/czdsdump download one -v -o /tmp -u <user> -p <password> -z com
 ```
 
 ### Resources / Information
