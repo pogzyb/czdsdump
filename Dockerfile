@@ -24,4 +24,4 @@ LABEL org.opencontainers.image.licenses="MIT"
 COPY --from=stage /build/czdsdump /usr/local/bin/czdsdump
 USER guest
 ENTRYPOINT [ "czdsdump" ]
-CMD [ "all", "--help" ]
+CMD [ "--help" ]
