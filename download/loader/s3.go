@@ -6,7 +6,6 @@ import (
 	"io"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -50,35 +49,29 @@ type S3Loader struct {
 	Key        string
 	fileChunks chan *Chunk
 	NumWorkers int
-	Uploader   manager.Uploader
+	Uploader   *manager.Uploader
 	ZoneURL    string
 }
 
 func NewS3Loader(outputFile, zoneURL string, numWorkers int) (*S3Loader, error) {
-	uploader := manager.NewUploader(clientS3)
-	if needsCustomPartSize(zoneURL) {
-		uploader.PartSize = 10 * 1024 * 1024 // 10 Mib
-	}
-	pathParsed, err := url.Parse(outputFile)
+	// Create an uploader with the client and custom options
+	uploader := manager.NewUploader(clientS3, func(u *manager.Uploader) {
+		if needsCustomPartSize(zoneURL) {
+			u.PartSize = 10 * 1024 * 1024 // 10MB per part
+		}
+	})
+	u, err := url.Parse(outputFile)
 	if err != nil {
 		return nil, err
 	}
-	zoneParsed, err := url.Parse(zoneURL)
-	if err != nil {
-		return nil, err
-	}
-	split := strings.Split(zoneParsed.Path, "/")
-	zoneName := split[len(split)-1]
-	bucket := pathParsed.Host
-	prefix := filepath.Join(pathParsed.Path, zoneName) + ".txt.gz"
-	key := strings.TrimPrefix(prefix, "/")
 	fc := make(chan *Chunk, numWorkers)
 	return &S3Loader{
-		Bucket:     bucket,
-		Key:        key,
+		Bucket:     u.Host,
+		Key:        strings.TrimLeft(u.Path, "/"),
 		fileChunks: fc,
 		NumWorkers: numWorkers,
 		ZoneURL:    zoneURL,
+		Uploader:   uploader,
 	}, nil
 }
 
@@ -97,10 +90,10 @@ func (sl S3Loader) DownloadZone(ctx context.Context, accessToken string) error {
 	return err
 }
 
-// Saves the data in the `io.Reader` out to the FileLoader's File.
+// Saves the data in the `io.Reader` out to the S3 bucket
 func (sl S3Loader) Save(ctx context.Context, r io.Reader) error {
 	fn := func() error {
-		_, err := sl.Uploader.Upload(ctx, &s3.PutObjectInput{
+		_, err := sl.Uploader.Upload(context.Background(), &s3.PutObjectInput{
 			Bucket: aws.String(sl.Bucket),
 			Key:    aws.String(sl.Key),
 			Body:   r,
@@ -110,10 +103,9 @@ func (sl S3Loader) Save(ctx context.Context, r io.Reader) error {
 		}
 		return nil
 	}
-	boConst := backoff.NewConstantBackOff(time.Minute * 3)
-	boContext := backoff.WithContext(boConst, ctx)
-	boRetries := backoff.WithMaxRetries(boContext, 2)
-	if err := backoff.Retry(fn, boRetries); err != nil {
+	backOffCtx := backoff.WithContext(backoff.NewConstantBackOff(time.Minute*3), ctx)
+	retry := backoff.WithMaxRetries(backOffCtx, 2)
+	if err := backoff.Retry(fn, retry); err != nil {
 		return err
 	}
 	return nil
