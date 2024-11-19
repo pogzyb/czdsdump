@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"path"
 	"path/filepath"
+	"strings"
 	"syscall"
 
 	"github.com/pogzyb/czdsdump/auth"
@@ -62,8 +64,12 @@ func DownloadOne(username, password, outputDir, zone string, workers int) {
 			return
 		}
 		// form the output filename
-		outputFile := filepath.Join(outputDir, zone) + ".txt.gz"
-		log.Debug().Msg(outputFile)
+		var outputFile string
+		if strings.HasPrefix(outputDir, "s3://") || strings.HasPrefix(outputDir, "S3://") {
+			outputFile = path.Join(outputDir, zone) + ".txt.gz"
+		} else {
+			outputFile = filepath.Join(outputDir, zone) + ".txt.gz"
+		}
 		// init the loader
 		loader, err := download.NewLoader(outputFile, zoneURL, workers)
 		if err != nil {
