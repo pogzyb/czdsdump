@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/pogzyb/czdsdump/download/loader"
-	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -34,7 +36,6 @@ type Loader interface {
 
 func NewLoader(outputFile, zoneURL string, numWorkers int) (Loader, error) {
 	if strings.HasPrefix(outputFile, "s3://") || strings.HasPrefix(outputFile, "S3://") {
-		log.Debug().Msg("Using S3 Loader!")
 		return loader.NewS3Loader(outputFile, zoneURL, numWorkers)
 	} else {
 		return loader.NewFileLoader(outputFile, zoneURL, numWorkers), nil
@@ -65,4 +66,16 @@ func GetZoneURLs(ctx context.Context, accessToken string) ([]string, error) {
 		return []string{}, err
 	}
 	return zones, nil
+}
+
+func GetOutputFile(dir, zone string) (string, error) {
+	if strings.HasPrefix(dir, "s3://") || strings.HasPrefix(dir, "S3://") {
+		u, err := url.Parse(dir)
+		if err != nil {
+			return "", err
+		}
+		return fmt.Sprintf("s3://%s.txt.gz", path.Join(u.Host, u.Path, zone)), nil
+	} else {
+		return fmt.Sprintf("%s.txt.gz", filepath.Join(dir, zone)), nil
+	}
 }

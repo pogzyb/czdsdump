@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 
 	"github.com/pogzyb/czdsdump/auth"
@@ -60,7 +59,10 @@ func DownloadAll(username, password, outputDir string, workers int) {
 				}
 				// form the output filename
 				tld := download.GetTLDFromURL(zoneURL)
-				outputFile := filepath.Join(outputDir, tld) + ".txt.gz"
+				outputFile, err := download.GetOutputFile(outputDir, tld)
+				if err != nil {
+					log.Fatal().Msg(fmt.Sprintf("could not prepare output file: %s err: %v", outputDir, err))
+				}
 				// init the loader
 				loader, err := download.NewLoader(outputFile, zoneURL, workers/2)
 				if err != nil {
