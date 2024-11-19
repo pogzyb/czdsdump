@@ -31,7 +31,15 @@ func GetAccessToken(ctx context.Context, username, password string) (string, err
 	if err != nil {
 		return "", err
 	}
-	resp, err := http.Post(AuthURL, "application/json", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, "POST", AuthURL, bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header = http.Header{
+		"Content-Type": {"application/json"},
+		"Accept":       {"application/json"},
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", err
 	}
