@@ -12,8 +12,8 @@ import (
 )
 
 type Chunk struct {
-	Index int
-	Data  []byte
+	Index  int
+	Buffer *bytes.Buffer
 }
 
 func calcChunkSize(totalSize, workers int) int {
@@ -22,7 +22,9 @@ func calcChunkSize(totalSize, workers int) int {
 }
 
 func downloadChunk(ctx context.Context, index, size, workers int, accessToken, zoneURL string, chunks chan *Chunk) {
-	client := http.Client{}
+	client := http.Client{Timeout: time.Second * 120}
+	buffer := &bytes.Buffer{}
+	chunk := &Chunk{Index: index, Buffer: buffer}
 	startBytes := index * size
 	reqRange := fmt.Sprintf("bytes=%d-%d", startBytes, startBytes+size-1)
 	if workers-1 == index {
@@ -39,11 +41,8 @@ func downloadChunk(ctx context.Context, index, size, workers int, accessToken, z
 		return
 	}
 	defer resp.Body.Close()
-	chunk, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return
-	}
-	chunks <- &Chunk{Index: index, Data: chunk}
+	io.Copy(chunk.Buffer, resp.Body)
+	chunks <- chunk
 }
 
 func download(ctx context.Context, accessToken, zoneURL string, numWorkers int, fileChunks chan *Chunk) (io.Reader, error) {
@@ -71,17 +70,13 @@ func download(ctx context.Context, accessToken, zoneURL string, numWorkers int, 
 			ctx, i, chunkSize, numWorkers, accessToken, zoneURL, fileChunks)
 	}
 	chunkCount := 0
-	chunks := make([][]byte, numWorkers)
+	chunkBuffers := make([]io.Reader, numWorkers)
 	for chunk := range fileChunks {
-		chunks[chunk.Index] = chunk.Data
+		chunkBuffers[chunk.Index] = chunk.Buffer
 		chunkCount++
 		if chunkCount == numWorkers {
 			break
 		}
 	}
-	combined := []byte{}
-	for _, chunk := range chunks {
-		combined = append(combined, chunk...)
-	}
-	return bytes.NewReader(combined), nil
+	return io.MultiReader(chunkBuffers[:]...), nil
 }
