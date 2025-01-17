@@ -50,6 +50,7 @@ func DownloadAll(username, password, outputDir string, workers int) {
 	// Channel size determines download concurrency
 	zonesQueue := make(chan string, workers)
 	for range workers {
+		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for zoneURL := range zonesQueue {
@@ -79,7 +80,6 @@ func DownloadAll(username, password, outputDir string, workers int) {
 				log.Info().Msg(fmt.Sprintf("Saved %s", outputFile))
 			}
 		}()
-		wg.Add(1)
 	}
 	// Submit the zone links to be downloaded to the workers
 	done := make(chan struct{}, 1)
