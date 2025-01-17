@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/cenkalti/backoff/v4"
 )
 
 type Chunk struct {
@@ -36,8 +38,14 @@ func downloadChunk(ctx context.Context, index, size, workers int, accessToken, z
 	}
 	req.Header.Add("Range", reqRange)
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
-	resp, err := client.Do(req)
-	if err != nil {
+	var resp *http.Response
+	do := func() error {
+		resp, err = client.Do(req)
+		return err
+	}
+	backOffCtx := backoff.WithContext(backoff.NewConstantBackOff(time.Minute*1), ctx)
+	retry := backoff.WithMaxRetries(backOffCtx, 2)
+	if err := backoff.Retry(do, retry); err != nil {
 		return
 	}
 	defer resp.Body.Close()
