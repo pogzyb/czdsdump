@@ -18,8 +18,8 @@ go build -o czdsdump .
 # all zones
 ./czdsdump download all -v -o /tmp -u <user> -p <password>
 
-# one zone (".co")
-./czdsdump download one -v -o /tmp -u <user> -p <password> -z co
+# one zone (".com")
+./czdsdump download one -v -o /tmp -u <user> -p <password> -z com
 ```
 
 Docker
