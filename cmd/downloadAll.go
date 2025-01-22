@@ -37,6 +37,8 @@ Learn More: https://www.icann.org/resources/pages/czds-2014-03-03-en`,
 	}
 )
 
+// TODO: Refactor some of this functionality into the download package;
+//  there's too much biz logic here for a single command. 
 func DownloadAll(username, password, outputDir string, workers int) {
 	// Handle termination
 	sigs := make(chan os.Signal, 1)
@@ -45,7 +47,7 @@ func DownloadAll(username, password, outputDir string, workers int) {
 	// Authentication with ICANN
 	accessToken, err := auth.GetAccessToken(ctx, username, password)
 	if err != nil {
-		log.Fatal().Msg(fmt.Sprintf("could not get access token: %v", err))
+		log.Fatal().Msg(fmt.Sprintf("could not get access token from ICANN: %v", err))
 	}
 	// Channel size determines download concurrency
 	zonesQueue := make(chan string, workers)
@@ -81,28 +83,28 @@ func DownloadAll(username, password, outputDir string, workers int) {
 			}
 		}()
 	}
-	// Submit the zone links to be downloaded to the workers
+	// Channel for signalling that all zones have been downloaded
 	done := make(chan struct{}, 1)
+	// Retrieve all download URLs
+	zoneURLs, err := download.GetZoneURLs(ctx, accessToken)
+	if err != nil {
+		// Cannot proceed without download links
+		log.Fatal().Msgf("could not get download URLs from ICANN: %v", err)
+	}
+	log.Info().Msgf("Retrieving data from %d zones.", len(zoneURLs))
+	// Submit download URLs to the workers
 	go func() {
 		defer func() { done <- struct{}{} }()
-		zoneURLs, err := download.GetZoneURLs(ctx, accessToken)
-		if err != nil {
-			log.Debug().Msg(fmt.Sprintf("could not get zone links: %v", err))
-			close(zonesQueue)
-
-		} else {
-			log.Info().Msg(fmt.Sprintf("Retrieving data from %d zones.", len(zoneURLs)))
-			for _, zoneURL := range zoneURLs {
-				zonesQueue <- zoneURL
-			}
-			// All zone links have been submitted;
-			// close the channel and wait for workers to finish
-			close(zonesQueue)
-			wg.Wait()
+		for _, zoneURL := range zoneURLs {
+			zonesQueue <- zoneURL
 		}
+		// All zone links have been submitted;
+		// close the channel and wait for workers to finish
+		close(zonesQueue)
+		wg.Wait()
 	}()
 	for {
-		// Wait for completion
+		// Wait for completion or interruption
 		select {
 		case <-sigs:
 			log.Info().Msg("Received Termination.")
