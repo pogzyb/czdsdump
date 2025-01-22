@@ -56,27 +56,27 @@ func DownloadOne(username, password, outputDir, zone string, workers int) {
 	go func() {
 		defer func() { done <- struct{}{} }()
 		zoneURL := fmt.Sprintf("https://czds-download-api.icann.org/czds/downloads/%s.zone", zone)
-		log.Info().Msg(fmt.Sprintf("Downloading %s", zoneURL))
+		log.Info().Msgf("Downloading %s", zoneURL)
 		if ctx.Err() != nil {
 			return
 		}
 		outputFile, err := download.GetOutputFile(outputDir, zone)
 		if err != nil {
-			log.Fatal().Msg(fmt.Sprintf("could not prepare output file: %s err: %v", outputDir, err))
+			log.Fatal().Msgf("could not prepare output file: %s err: %v", outputDir, err)
 		}
 		// init the loader
 		loader, err := download.NewLoader(outputFile, zoneURL, workers)
 		if err != nil {
-			log.Debug().Msg(fmt.Sprintf("could not get loader: %v", err))
+			log.Debug().Msgf("could not get loader: %v", err)
 			return
 		}
 		// download and save
 		err = loader.DownloadZone(ctx, accessToken)
 		if err != nil {
-			log.Debug().Msg(fmt.Sprintf("could not download: %s: %v", zoneURL, err))
+			log.Debug().Msgf("could not download: %s: %v", zoneURL, err)
 			return
 		}
-		log.Info().Msg(fmt.Sprintf("Saved %s", outputFile))
+		log.Info().Msgf("Saved %s", outputFile)
 	}()
 	for {
 		// Wait for completion

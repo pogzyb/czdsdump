@@ -47,7 +47,7 @@ func DownloadAll(username, password, outputDir string, workers int) {
 	// Authentication with ICANN
 	accessToken, err := auth.GetAccessToken(ctx, username, password)
 	if err != nil {
-		log.Fatal().Msg(fmt.Sprintf("could not get access token from ICANN: %v", err))
+		log.Fatal().Msgf("could not get access token from ICANN: %v", err)
 	}
 	// Channel size determines download concurrency
 	zonesQueue := make(chan string, workers)
@@ -64,22 +64,22 @@ func DownloadAll(username, password, outputDir string, workers int) {
 				tld := download.GetTLDFromURL(zoneURL)
 				outputFile, err := download.GetOutputFile(outputDir, tld)
 				if err != nil {
-					log.Fatal().Msg(fmt.Sprintf("could not prepare output file: %s err: %v", outputDir, err))
+					log.Fatal().Msgf("could not prepare output file: %s err: %v", outputDir, err)
 				}
 				// init the loader
 				loader, err := download.NewLoader(outputFile, zoneURL, workers/2)
 				if err != nil {
-					log.Debug().Msg(fmt.Sprintf("could not get loader: %v", err))
+					log.Debug().Msgf("could not get loader: %v", err)
 					continue
 				}
-				log.Info().Msg(fmt.Sprintf("Downloading %s", zoneURL))
+				log.Info().Msgf("Downloading %s", zoneURL)
 				// download and save
 				err = loader.DownloadZone(ctx, accessToken)
 				if err != nil {
 					log.Debug().Msg(fmt.Sprintf("could not download: %s: %v", zoneURL, err))
 					continue
 				}
-				log.Info().Msg(fmt.Sprintf("Saved %s", outputFile))
+				log.Info().Msgf("Saved %s", outputFile)
 			}
 		}()
 	}
