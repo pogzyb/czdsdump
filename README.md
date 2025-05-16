@@ -37,7 +37,6 @@ docker run --env-file .env.aws ghcr.io/pogzyb/czdsdump download all -v -o s3://m
 
 Dump only one zone
 ```
-# assumes you have aws credentials set in `.env.aws`
 docker pull ghcr.io/pogzyb/czdsdump:latest
 # only downloads data from ".com" zone
 docker run -v ./data:/tmp ghcr.io/pogzyb/czdsdump download one -v -o /tmp -u <user> -p <password> -z com
