@@ -1,16 +1,16 @@
-FROM golang:alpine3.19 as stage
+FROM golang:alpine3.23 AS stage
 
 WORKDIR /build
 COPY . .
 RUN go build -o czdsdump .
 
-FROM alpine:3.19
+FROM alpine:3.23
 
 ARG VERSION
 ARG CREATED
 ARG REVISION
 
-LABEL org.opencontainers.image.title="CZDSdump"
+LABEL org.opencontainers.image.title="czdsdump"
 LABEL org.opencontainers.image.description="Tool for dumping the Centralized Zone Data System."
 LABEL org.opencontainers.image.version=$VERSION
 LABEL org.opencontainers.image.authors="pogzyb@umich.edu"
