@@ -29,9 +29,7 @@ func init() {
 }
 
 type Loader interface {
-	Download(ctx context.Context, accessToken string) (io.Reader, error)
 	DownloadZone(ctx context.Context, accessToken string) error
-	Save(ctx context.Context, r io.Reader) error
 }
 
 func NewLoader(outputFile, zoneURL string, numWorkers int) (Loader, error) {

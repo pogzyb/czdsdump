@@ -37,8 +37,6 @@ Learn More: https://www.icann.org/resources/pages/czds-2014-03-03-en`,
 	}
 )
 
-// TODO: Refactor some of this functionality into the download package;
-//  there's too much biz logic here for a single command. 
 func DownloadAll(username, password, outputDir string, workers int) {
 	// Handle termination
 	sigs := make(chan os.Signal, 1)

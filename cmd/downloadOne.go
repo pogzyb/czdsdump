@@ -56,7 +56,6 @@ func DownloadOne(username, password, outputDir, zone string, workers int) {
 	go func() {
 		defer func() { done <- struct{}{} }()
 		zoneURL := fmt.Sprintf("https://czds-download-api.icann.org/czds/downloads/%s.zone", zone)
-		log.Info().Msgf("Downloading %s", zoneURL)
 		if ctx.Err() != nil {
 			return
 		}
@@ -71,6 +70,7 @@ func DownloadOne(username, password, outputDir, zone string, workers int) {
 			return
 		}
 		// download and save
+		log.Info().Msgf("Downloading %s", zoneURL)
 		err = loader.DownloadZone(ctx, accessToken)
 		if err != nil {
 			log.Debug().Msgf("could not download: %s: %v", zoneURL, err)
