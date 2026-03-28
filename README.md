@@ -1,6 +1,6 @@
 # czdsdump
 
-Utility for dumping zone files from the CZDS to an S3 Bucket or FileSystem.
+Utility for dumping zone files from the Centralized Zone Data Service to an S3 Bucket or File System.
 
 > The Centralized Zone Data Service (CZDS) is an online portal where any interested party can request access to the Zone Files provided by participating generic Top-Level Domains (gTLDs).
 
@@ -25,21 +25,21 @@ go build -o czdsdump .
 Docker
 ```
 docker pull ghcr.io/pogzyb/czdsdump:latest
-docker run -v ./data:/tmp ghcr.io/pogzyb/czdsdump download all -v -o /tmp -u <user> -p <password>
+docker run -v ./data/:/tmp/czds/ ghcr.io/pogzyb/czdsdump download all -v -o /tmp/czds/ -u <user> -p <password>
 ```
 
 Dump to an S3 bucket
 ```
-# assumes you have aws credentials set in `.env.aws`
+# assumes you have aws credentials and region set in `.env.aws`
 docker pull ghcr.io/pogzyb/czdsdump:latest
-docker run --env-file .env.aws ghcr.io/pogzyb/czdsdump download all -v -o s3://mybucket/czds/2024-04-28/ -u <user> -p <password>
+docker run --env-file .env.aws ghcr.io/pogzyb/czdsdump download all -v -o s3://mybucket/czds/2026-03-28/ -u <user> -p <password>
 ```
 
 Dump only one zone
 ```
 docker pull ghcr.io/pogzyb/czdsdump:latest
 # only downloads data from ".com" zone
-docker run -v ./data:/tmp ghcr.io/pogzyb/czdsdump download one -v -o /tmp -u <user> -p <password> -z com
+docker run -v ./data/:/tmp/czds/ ghcr.io/pogzyb/czdsdump download one -v -o /tmp/czds/ -u <user> -p <password> -z com
 ```
 
 ### Resources / Information
