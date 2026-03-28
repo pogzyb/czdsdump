@@ -53,7 +53,7 @@ func (fl FileLoader) DownloadZone(ctx context.Context, accessToken string) error
 	}
 	// Send chunks to the worker pool
 	numChunks := int(max(math.Ceil(float64(fs/int(defaultChunkSize))), 1))
-	for i := 0; i <= numChunks; i++ {
+	for i := range numChunks {
 		start := i * int(defaultChunkSize)
 		if i > 0 {
 			start += 1
