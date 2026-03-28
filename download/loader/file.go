@@ -2,48 +2,67 @@ package loader
 
 import (
 	"context"
-	"io"
+	"math"
 	"os"
+	"sync"
+
+	"github.com/rs/zerolog/log"
 )
 
 type FileLoader struct {
-	File       string
-	fileChunks chan *Chunk
+	Filename   string
 	NumWorkers int
 	ZoneURL    string
+	chunks     chan *FileChunk
 }
 
 func NewFileLoader(outputFile, zoneURL string, numWorkers int) FileLoader {
-	fc := make(chan *Chunk, numWorkers)
 	return FileLoader{
-		File:       outputFile,
-		fileChunks: fc,
+		Filename:   outputFile,
 		NumWorkers: numWorkers,
 		ZoneURL:    zoneURL,
+		chunks:     make(chan *FileChunk, numWorkers),
 	}
 }
 
-// Downloads the zone data concurrently and returns the resulting file as an `io.Reader`.
-func (fl FileLoader) Download(ctx context.Context, accessToken string) (io.Reader, error) {
-	return download(ctx, accessToken, fl.ZoneURL, fl.NumWorkers, fl.fileChunks)
-}
-
-// Simply combines the functionality of FileLoader's `Download` and `Save` functions.
 func (fl FileLoader) DownloadZone(ctx context.Context, accessToken string) error {
-	r, err := fl.Download(ctx, accessToken)
+	var wg sync.WaitGroup
+	// Fetch the file size
+	fs, err := getFileSize(ctx, fl.ZoneURL, accessToken)
 	if err != nil {
 		return err
 	}
-	err = fl.Save(ctx, r)
-	return err
-}
-
-// Saves the data in the `io.Reader` out to the FileLoader's File.
-func (fl FileLoader) Save(ctx context.Context, r io.Reader) error {
-	f, err := os.Create(fl.File)
+	// Open the output file
+	f, err := os.Create(fl.Filename)
 	if err != nil {
 		return err
 	}
-	_, err = io.Copy(f, r)
-	return err
+	// Start worker pool
+	for range fl.NumWorkers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for chunk := range fl.chunks {
+				err := downloadAndWriteChunk(ctx, fl.ZoneURL, accessToken, chunk.Start, chunk.End, f)
+				if err != nil {
+					log.Error().Msgf("could not download and write: %v", err)
+				}
+				log.Debug().Msgf("Finished start=%d end=%d zone=%s", chunk.Start, chunk.End, fl.ZoneURL)
+			}
+		}()
+	}
+	// Send chunks to the worker pool
+	numChunks := int(max(math.Ceil(float64(fs/int(defaultChunkSize))), 1))
+	for i := 0; i <= numChunks; i++ {
+		start := i * int(defaultChunkSize)
+		if i > 0 {
+			start += 1
+		}
+		end := min(start+int(defaultChunkSize), fs)
+		fl.chunks <- &FileChunk{Start: int64(start), End: int64(end), File: f}
+	}
+	// Close worker pool
+	close(fl.chunks)
+	wg.Wait()
+	return nil
 }

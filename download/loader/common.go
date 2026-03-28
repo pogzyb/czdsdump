@@ -1,43 +1,34 @@
 package loader
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
+	"os"
 	"strconv"
 	"time"
 
 	"github.com/cenkalti/backoff/v4"
 )
 
-type Chunk struct {
-	Index  int
-	Buffer *bytes.Buffer
+type FileChunk struct {
+	Start int64
+	End   int64
+	File  *os.File
 }
 
-func calcChunkSize(totalSize, workers int) int {
-	v := float64(totalSize) / float64(workers)
-	return int(math.Ceil(v))
-}
+var defaultChunkSize int64 = 5e6 // 5MB
 
-func downloadChunk(ctx context.Context, index, size, workers int, accessToken, zoneURL string, chunks chan *Chunk) {
+func downloadAndWriteChunk(ctx context.Context, url, token string, start, end int64, file *os.File) error {
 	client := http.Client{Timeout: time.Second * 120}
-	buffer := &bytes.Buffer{}
-	chunk := &Chunk{Index: index, Buffer: buffer}
-	startBytes := index * size
-	reqRange := fmt.Sprintf("bytes=%d-%d", startBytes, startBytes+size-1)
-	if workers-1 == index {
-		reqRange = fmt.Sprintf("bytes=%d-", startBytes)
-	}
-	req, err := http.NewRequestWithContext(ctx, "GET", zoneURL, nil)
+	reqRange := fmt.Sprintf("bytes=%d-%d", start, end)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return
+		return err
 	}
 	req.Header.Add("Range", reqRange)
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 	var resp *http.Response
 	do := func() error {
 		resp, err = client.Do(req)
@@ -46,45 +37,30 @@ func downloadChunk(ctx context.Context, index, size, workers int, accessToken, z
 	backOffCtx := backoff.WithContext(backoff.NewConstantBackOff(time.Minute*1), ctx)
 	retry := backoff.WithMaxRetries(backOffCtx, 2)
 	if err := backoff.Retry(do, retry); err != nil {
-		return
+		return err
 	}
-	defer resp.Body.Close()
-	io.Copy(chunk.Buffer, resp.Body)
-	chunks <- chunk
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	_, err = file.WriteAt(bodyBytes, start)
+	return err
 }
 
-func download(ctx context.Context, accessToken, zoneURL string, numWorkers int, fileChunks chan *Chunk) (io.Reader, error) {
+func getFileSize(ctx context.Context, zoneURL, token string) (int, error) {
 	client := http.Client{Timeout: time.Second * 120}
 	req, err := http.NewRequestWithContext(ctx, "HEAD", zoneURL, nil)
 	if err != nil {
-		return nil, err
+		return -1, err
 	}
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, err
+		return -1, err
 	}
 	contentLength := resp.Header.Get("Content-Length")
 	if contentLength == "" {
-		return nil, fmt.Errorf("could not get Content-Length header")
+		return -1, fmt.Errorf("could not get Content-Length header")
 	}
-	fileSize, err := strconv.Atoi(contentLength)
-	if err != nil {
-		return nil, err
-	}
-	chunkSize := calcChunkSize(fileSize, numWorkers)
-	for i := range numWorkers {
-		go downloadChunk(
-			ctx, i, chunkSize, numWorkers, accessToken, zoneURL, fileChunks)
-	}
-	chunkCount := 0
-	chunkBuffers := make([]io.Reader, numWorkers)
-	for chunk := range fileChunks {
-		chunkBuffers[chunk.Index] = chunk.Buffer
-		chunkCount++
-		if chunkCount == numWorkers {
-			break
-		}
-	}
-	return io.MultiReader(chunkBuffers[:]...), nil
+	return strconv.Atoi(contentLength)
 }
