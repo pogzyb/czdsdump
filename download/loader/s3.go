@@ -3,7 +3,6 @@ package loader
 import (
 	"context"
 	"io"
-	"math"
 	"net/url"
 	"os"
 	"strings"
@@ -115,14 +114,9 @@ func (sl S3Loader) DownloadZone(ctx context.Context, accessToken string) error {
 		}()
 	}
 	// Send chunks to the worker pool
-	numChunks := int(max(math.Ceil(float64(fs/int(defaultChunkSize))), 1))
-	for i := range numChunks {
-		start := i * int(defaultChunkSize)
-		if i > 0 {
-			start += 1
-		}
-		end := min(start+int(defaultChunkSize), fs)
-		sl.chunks <- &FileChunk{Start: int64(start), End: int64(end), File: f}
+	for start := int64(0); start < fs; start += defaultChunkSize {
+		end := min(start+defaultChunkSize-1, fs-1)
+		sl.chunks <- &FileChunk{Start: start, End: end, File: f}
 	}
 	// Close worker pool
 	close(sl.chunks)

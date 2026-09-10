@@ -41,8 +41,10 @@ func NewLoader(outputFile, zoneURL string, numWorkers int) (Loader, error) {
 }
 
 func GetTLDFromURL(zoneURL string) string {
-	splits := strings.Split(zoneURL, "/")
-	return splits[len(splits)-1]
+	trimmed := strings.TrimRight(zoneURL, "/")
+	splits := strings.Split(trimmed, "/")
+	last := splits[len(splits)-1]
+	return strings.TrimSuffix(last, ".zone")
 }
 
 func GetZoneURLs(ctx context.Context, accessToken string) ([]string, error) {

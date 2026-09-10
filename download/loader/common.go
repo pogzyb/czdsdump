@@ -39,6 +39,7 @@ func downloadAndWriteChunk(ctx context.Context, url, token string, start, end in
 	if err := backoff.Retry(do, retry); err != nil {
 		return err
 	}
+	defer resp.Body.Close()
 	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
@@ -47,7 +48,7 @@ func downloadAndWriteChunk(ctx context.Context, url, token string, start, end in
 	return err
 }
 
-func getFileSize(ctx context.Context, zoneURL, token string) (int, error) {
+func getFileSize(ctx context.Context, zoneURL, token string) (int64, error) {
 	client := http.Client{Timeout: time.Second * 120}
 	req, err := http.NewRequestWithContext(ctx, "HEAD", zoneURL, nil)
 	if err != nil {
@@ -58,9 +59,10 @@ func getFileSize(ctx context.Context, zoneURL, token string) (int, error) {
 	if err != nil {
 		return -1, err
 	}
+	defer resp.Body.Close()
 	contentLength := resp.Header.Get("Content-Length")
 	if contentLength == "" {
 		return -1, fmt.Errorf("could not get Content-Length header")
 	}
-	return strconv.Atoi(contentLength)
+	return strconv.ParseInt(contentLength, 10, 64)
 }
